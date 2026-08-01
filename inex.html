@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  />
+
+  <title>Alaska Atlas Live Map</title>
+
+  <link
+    href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      font-family: Arial, sans-serif;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+    }
+
+    #status {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 10;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      font-size: 16px;
+    }
+
+    #telemetry {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      z-index: 10;
+
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      font-size: 16px;
+    }
+
+    .vehicle-marker {
+      width: 26px;
+      height: 26px;
+      border: 4px solid white;
+      border-radius: 50%;
+      background: #1976d2;
+      box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.3);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <div id="status">Waiting for GPS permission…</div>
+
+  <div id="telemetry">
+    <span id="speed">0 mph</span>
+    <span id="heading">Heading: --</span>
+    <span id="altitude">Altitude: --</span>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+
+  <script>
+    const statusElement = document.getElementById("status");
+    const speedElement = document.getElementById("speed");
+    const headingElement = document.getElementById("heading");
+    const altitudeElement = document.getElementById("altitude");
+
+    const initialLocation = [-149.9003, 61.2181];
+
+    const map = new maplibregl.Map({
+      container: "map",
+
+      style: {
+        version: 8,
+        sources: {
+          openStreetMap: {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            ],
+            tileSize: 256,
+            attribution: "© OpenStreetMap contributors"
+          }
+        },
+
+        layers: [
+          {
+            id: "openStreetMap",
+            type: "raster",
+            source: "openStreetMap"
+          }
+        ]
+      },
+
+      center: initialLocation,
+      zoom: 9,
+      attributionControl: false
+    });
+
+    const markerElement = document.createElement("div");
+    markerElement.className = "vehicle-marker";
+
+    const marker = new maplibregl.Marker({
+      element: markerElement
+    })
+      .setLngLat(initialLocation)
+      .addTo(map);
+
+    function metersPerSecondToMph(speed) {
+      if (speed === null || speed === undefined || Number.isNaN(speed)) {
+        return 0;
+      }
+
+      return speed * 2.23694;
+    }
+
+    function directionFromDegrees(degrees) {
+      if (
+        degrees === null ||
+        degrees === undefined ||
+        Number.isNaN(degrees)
+      ) {
+        return "--";
+      }
+
+      const directions = [
+        "N",
+        "NE",
+        "E",
+        "SE",
+        "S",
+        "SW",
+        "W",
+        "NW"
+      ];
+
+      const index = Math.round(degrees / 45) % 8;
+      return directions[index];
+    }
+
+    function handlePosition(position) {
+      const coordinates = position.coords;
+      const longitude = coordinates.longitude;
+      const latitude = coordinates.latitude;
+      const heading = coordinates.heading;
+      const mph = metersPerSecondToMph(coordinates.speed);
+
+      marker.setLngLat([longitude, latitude]);
+
+      map.easeTo({
+        center: [longitude, latitude],
+        zoom: 9,
+        bearing:
+          heading !== null && !Number.isNaN(heading)
+            ? heading
+            : map.getBearing(),
+        duration: 1500,
+        essential: true
+      });
+
+      speedElement.textContent = `${Math.round(mph)} mph`;
+      headingElement.textContent =
+        `Heading: ${directionFromDegrees(heading)}`;
+
+      altitudeElement.textContent =
+        coordinates.altitude !== null
+          ? `Altitude: ${Math.round(coordinates.altitude * 3.28084)} ft`
+          : "Altitude: --";
+
+      statusElement.textContent =
+        `GPS connected • ±${Math.round(coordinates.accuracy)} m`;
+    }
+
+    function handlePositionError(error) {
+      const messages = {
+        1: "Location permission denied",
+        2: "GPS location unavailable",
+        3: "GPS request timed out"
+      };
+
+      statusElement.textContent =
+        messages[error.code] || "Unable to read GPS";
+    }
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(
+        handlePosition,
+        handlePositionError,
+        {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 15000
+        }
+      );
+    } else {
+      statusElement.textContent =
+        "This device does not support browser GPS";
+    }
+  </script>
+</body>
+</html>

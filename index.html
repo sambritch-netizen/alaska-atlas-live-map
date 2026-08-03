@@ -123,31 +123,29 @@
 
     #lower-third .eyebrow {
       margin-bottom: 8px;
+      text-align: center;
+      display: block;
     }
 
     #tally-row {
       display: flex;
-      gap: 22px;
-      padding-bottom: 10px;
-      margin-bottom: 10px;
+      justify-content: center;
+      gap: 26px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
       border-bottom: 1px solid var(--hairline);
     }
 
     .tally-item {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .tally-item .glyph {
       font-size: 20px;
       filter: grayscale(1) sepia(1) hue-rotate(-8deg) saturate(2.2) brightness(0.95);
       opacity: 0.92;
-    }
-
-    .tally-item .n {
-      font-size: 18px;
-      font-weight: 700;
     }
 
     .tally-item .label {
@@ -158,44 +156,26 @@
       font-family: 'Oswald', sans-serif;
     }
 
-    #route-row {
+    #stats-row {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
+      align-items: baseline;
+      gap: 22px;
       font-size: 15px;
       font-weight: 500;
-      padding-bottom: 10px;
-      margin-bottom: 10px;
-      border-bottom: 1px solid var(--hairline);
+      flex-wrap: wrap;
     }
 
-    #route-row .stat .n {
+    #stats-row .stat {
+      text-align: center;
+    }
+
+    #stats-row .stat .n {
       font-weight: 700;
       color: var(--parchment);
     }
 
-    #route-row .stat .label {
-      font-size: 9px;
-      color: var(--slate);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      font-family: 'Oswald', sans-serif;
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    #telemetry-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 15px;
-      font-weight: 500;
-    }
-
-    #telemetry-row .stat .n {
-      font-weight: 700;
-      color: var(--parchment);
-    }
-
-    #telemetry-row .stat .label {
+    #stats-row .stat .label {
       font-size: 9px;
       color: var(--slate);
       letter-spacing: 0.1em;
@@ -240,40 +220,28 @@
   </div>
 
   <div id="lower-third">
-    <span class="eyebrow">Expedition Log</span>
+    <span class="eyebrow">Anchorage &ndash; Prudhoe Bay</span>
 
     <div id="tally-row">
       <div class="tally-item">
         <span class="glyph">🫎</span>
-        <div>
-          <span class="n" id="tally-moose">0</span>
-          <span class="label" style="display:block;">Moose</span>
-        </div>
+        <span class="label">Moose</span>
       </div>
       <div class="tally-item">
         <span class="glyph">🦌</span>
-        <div>
-          <span class="n" id="tally-caribou">0</span>
-          <span class="label" style="display:block;">Caribou</span>
-        </div>
+        <span class="label">Caribou</span>
       </div>
       <div class="tally-item">
         <span class="glyph">🐃</span>
-        <div>
-          <span class="n" id="tally-muskox">0</span>
-          <span class="label" style="display:block;">Musk Ox</span>
-        </div>
+        <span class="label">Musk Ox</span>
       </div>
       <div class="tally-item">
         <span class="glyph">🐻</span>
-        <div>
-          <span class="n" id="tally-bear">0</span>
-          <span class="label" style="display:block;">Bear</span>
-        </div>
+        <span class="label">Bear</span>
       </div>
     </div>
 
-    <div id="route-row">
+    <div id="stats-row">
       <div class="stat">
         <span class="label">From Anchorage</span>
         <span class="n" id="miles-from">-- mi</span>
@@ -282,9 +250,6 @@
         <span class="label">To Prudhoe Bay</span>
         <span class="n" id="miles-to">-- mi</span>
       </div>
-    </div>
-
-    <div id="telemetry-row">
       <div class="stat">
         <span class="label">Speed</span>
         <span class="n" id="speed">0 mph</span>
@@ -312,13 +277,6 @@
     const milesToElement = document.getElementById("miles-to");
     const tempReadout = document.getElementById("temp-readout");
     const needle = document.getElementById("needle");
-
-    const tallyElements = {
-      moose: document.getElementById("tally-moose"),
-      caribou: document.getElementById("tally-caribou"),
-      muskox: document.getElementById("tally-muskox"),
-      bear: document.getElementById("tally-bear"),
-    };
 
     // Leaflet uses [lat, lon] order (MapLibre used [lon, lat] -- flipped here)
     const initialLocation = [61.2181, -149.9003];
@@ -519,25 +477,8 @@
       }
     }
 
-    async function pollCounts() {
-      try {
-        const res = await fetch(`${RELAY}/counts`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        for (const animal of Object.keys(tallyElements)) {
-          if (data[animal] !== undefined) {
-            tallyElements[animal].textContent = data[animal];
-          }
-        }
-      } catch (err) {
-        // leave last known tally on screen
-      }
-    }
-
     pollTelemetry();
-    pollCounts();
     setInterval(pollTelemetry, POLL_INTERVAL_MS);
-    setInterval(pollCounts, 2000);
   </script>
 </body>
 </html>

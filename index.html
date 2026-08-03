@@ -158,6 +158,31 @@
       font-family: 'Oswald', sans-serif;
     }
 
+    #route-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+      font-weight: 500;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    #route-row .stat .n {
+      font-weight: 700;
+      color: var(--parchment);
+    }
+
+    #route-row .stat .label {
+      font-size: 9px;
+      color: var(--slate);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: 'Oswald', sans-serif;
+      display: block;
+      margin-bottom: 2px;
+    }
+
     #telemetry-row {
       display: flex;
       justify-content: space-between;
@@ -248,6 +273,17 @@
       </div>
     </div>
 
+    <div id="route-row">
+      <div class="stat">
+        <span class="label">From Anchorage</span>
+        <span class="n" id="miles-from">-- mi</span>
+      </div>
+      <div class="stat">
+        <span class="label">To Prudhoe Bay</span>
+        <span class="n" id="miles-to">-- mi</span>
+      </div>
+    </div>
+
     <div id="telemetry-row">
       <div class="stat">
         <span class="label">Speed</span>
@@ -272,8 +308,12 @@
     const speedElement = document.getElementById("speed");
     const headingElement = document.getElementById("heading");
     const altitudeElement = document.getElementById("altitude");
+    const milesFromElement = document.getElementById("miles-from");
+    const milesToElement = document.getElementById("miles-to");
     const tempReadout = document.getElementById("temp-readout");
     const needle = document.getElementById("needle");
+
+    const TOTAL_ROUTE_MILES = 860; // Anchorage -> Prudhoe Bay/Deadhorse, driving distance
 
     const tallyElements = {
       moose: document.getElementById("tally-moose"),
@@ -393,6 +433,12 @@
       altitudeElement.textContent =
         fix.altitudeFt !== null ? `${Math.round(fix.altitudeFt)} ft` : "--";
 
+      if (fix.milesDriven !== null && fix.milesDriven !== undefined) {
+        const remaining = Math.max(0, TOTAL_ROUTE_MILES - fix.milesDriven);
+        milesFromElement.textContent = `${fix.milesDriven.toFixed(1)} mi`;
+        milesToElement.textContent = `${remaining.toFixed(1)} mi`;
+      }
+
       updateGauge(fix.tempF);
 
       if (!fix.relayReachable) {
@@ -426,6 +472,7 @@
           headingDeg: data.heading_deg,
           altitudeFt: data.altitude_ft,
           tempF: data.temp_f,
+          milesDriven: data.miles_driven,
           stale: !hasFix || ageMs > STALE_AFTER_MS,
           relayReachable: true
         };

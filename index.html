@@ -71,9 +71,15 @@
       border-radius: 6px;
       background: rgba(16, 22, 26, 0.88);
       border: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    #status-badge .eyebrow { margin-bottom: 2px; }
+    #status-badge.stale #wifi-bars rect {
+      fill: var(--warn) !important;
+      opacity: 0.6;
+    }
 
     #status-badge .coords {
       font-size: 15px;
@@ -82,31 +88,6 @@
     }
 
     #status-badge.stale .coords { color: var(--warn); }
-
-    #gauge-wrap {
-      position: absolute;
-      top: 12px;
-      right: 14px;
-      z-index: 1000;
-      width: 92px;
-      text-align: center;
-      background: rgba(16, 22, 26, 0.88);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
-      padding: 8px 6px 10px;
-    }
-
-    #gauge-wrap .eyebrow {
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    #temp-readout {
-      font-size: 14px;
-      font-weight: 700;
-      margin-top: -26px;
-      color: var(--parchment);
-    }
 
     #lower-third {
       position: absolute;
@@ -143,8 +124,9 @@
     }
 
     .tally-item .glyph {
-      font-size: 20px;
-      filter: grayscale(1) sepia(1) hue-rotate(-8deg) saturate(2.2) brightness(0.95);
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
       opacity: 0.92;
     }
 
@@ -197,26 +179,13 @@
   <div id="map"></div>
 
   <div id="status-badge">
-    <span class="eyebrow">GPS Relay</span>
-    <div class="coords" id="coords">Waiting for fix…</div>
-  </div>
-
-  <div id="gauge-wrap">
-    <span class="eyebrow">Temp</span>
-    <svg id="gauge" viewBox="0 0 100 70" width="92" height="64">
-      <path d="M 12 58 A 38 38 0 1 1 88 58" fill="none" stroke="rgba(236,230,214,0.15)" stroke-width="6" stroke-linecap="round"/>
-      <path d="M 12 58 A 38 38 0 1 1 88 58" fill="none" stroke="url(#gaugeGradient)" stroke-width="6" stroke-linecap="round"/>
-      <defs>
-        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#4C86A8"/>
-          <stop offset="50%" stop-color="#C1913F"/>
-          <stop offset="100%" stop-color="#B23B34"/>
-        </linearGradient>
-      </defs>
-      <line id="needle" x1="50" y1="58" x2="50" y2="26" stroke="#ECE6D6" stroke-width="2.5" stroke-linecap="round" style="transform-origin: 50px 58px;"/>
-      <circle cx="50" cy="58" r="4" fill="#C1913F"/>
+    <svg id="wifi-bars" viewBox="0 0 26 18" width="20" height="15">
+      <rect x="0" y="12" width="4" height="6" rx="1" fill="rgba(236,230,214,0.2)"/>
+      <rect x="7" y="8" width="4" height="10" rx="1" fill="rgba(236,230,214,0.2)"/>
+      <rect x="14" y="4" width="4" height="14" rx="1" fill="rgba(236,230,214,0.2)"/>
+      <rect x="21" y="0" width="4" height="18" rx="1" fill="rgba(236,230,214,0.2)"/>
     </svg>
-    <div id="temp-readout">-- °F</div>
+    <div class="coords" id="coords">Waiting for fix…</div>
   </div>
 
   <div id="lower-third">
@@ -224,19 +193,19 @@
 
     <div id="tally-row">
       <div class="tally-item">
-        <span class="glyph">🫎</span>
+        <img class="glyph" src="moose_icon.png" alt="Moose" />
         <span class="label">Moose</span>
       </div>
       <div class="tally-item">
-        <span class="glyph">🦌</span>
+        <img class="glyph" src="caribou_icon.png" alt="Caribou" />
         <span class="label">Caribou</span>
       </div>
       <div class="tally-item">
-        <span class="glyph">🐃</span>
+        <img class="glyph" src="muskox_icon.png" alt="Musk Ox" />
         <span class="label">Musk Ox</span>
       </div>
       <div class="tally-item">
-        <span class="glyph">🐻</span>
+        <span class="glyph" style="font-size: 20px; filter: grayscale(1) sepia(1) hue-rotate(-8deg) saturate(2.2) brightness(0.95); width: auto; height: auto;">🐻</span>
         <span class="label">Bear</span>
       </div>
     </div>
@@ -249,6 +218,14 @@
       <div class="stat">
         <span class="label">To Prudhoe Bay</span>
         <span class="n" id="miles-to">-- mi</span>
+      </div>
+      <div class="stat">
+        <span class="label">Temp</span>
+        <span class="n" id="temp-readout">-- °F</span>
+      </div>
+      <div class="stat">
+        <span class="label">Wind</span>
+        <span class="n" id="wind-readout">-- mph</span>
       </div>
       <div class="stat">
         <span class="label">Speed</span>
@@ -276,7 +253,8 @@
     const milesFromElement = document.getElementById("miles-from");
     const milesToElement = document.getElementById("miles-to");
     const tempReadout = document.getElementById("temp-readout");
-    const needle = document.getElementById("needle");
+    const windReadout = document.getElementById("wind-readout");
+    const wifiBars = document.getElementById("wifi-bars");
 
     // Leaflet uses [lat, lon] order (MapLibre used [lon, lat] -- flipped here)
     const initialLocation = [61.2181, -149.9003];
@@ -357,19 +335,35 @@
       return `${Math.abs(value).toFixed(4)}° ${dir}`;
     }
 
-    const GAUGE_MIN_F = -20;
-    const GAUGE_MAX_F = 80;
+    function updateTemp(tempF) {
+      tempReadout.textContent = tempF !== null && tempF !== undefined
+        ? `${Math.round(tempF)} °F`
+        : "-- °F";
+    }
 
-    function updateGauge(tempF) {
-      if (tempF === null || tempF === undefined) {
-        tempReadout.textContent = "-- °F";
+    function updateWind(mph, dirDeg) {
+      if (mph === null || mph === undefined) {
+        windReadout.textContent = "-- mph";
         return;
       }
-      const clamped = Math.max(GAUGE_MIN_F, Math.min(GAUGE_MAX_F, tempF));
-      const fraction = (clamped - GAUGE_MIN_F) / (GAUGE_MAX_F - GAUGE_MIN_F);
-      const angle = -135 + fraction * 270;
-      needle.style.transform = `rotate(${angle}deg)`;
-      tempReadout.textContent = `${Math.round(tempF)} °F`;
+      const dir = directionFromDegrees(dirDeg);
+      windReadout.textContent = dir !== "--"
+        ? `${Math.round(mph)} mph ${dir}`
+        : `${Math.round(mph)} mph`;
+    }
+
+    function updateWifiBars(bars) {
+      const rects = wifiBars.querySelectorAll("rect");
+      rects.forEach((rect, i) => {
+        if (bars === null || bars === undefined) {
+          // Unknown -- Termux:API not installed or not reporting yet
+          rect.setAttribute("fill", "rgba(236,230,214,0.2)");
+        } else if (i < bars) {
+          rect.setAttribute("fill", "#ECE6D6");
+        } else {
+          rect.setAttribute("fill", "rgba(236,230,214,0.2)");
+        }
+      });
     }
 
     // --- Telemetry relay polling ---------------------------------------
@@ -420,7 +414,9 @@
         milesToElement.textContent = "--";
       }
 
-      updateGauge(fix.tempF);
+      updateTemp(fix.tempF);
+      updateWind(fix.windMph, fix.windDirDeg);
+      updateWifiBars(fix.wifiBars);
 
       if (!fix.relayReachable) {
         coordsElement.textContent = "Relay unreachable";
@@ -453,6 +449,9 @@
           headingDeg: data.heading_deg,
           altitudeFt: data.altitude_ft,
           tempF: data.temp_f,
+          windMph: data.wind_mph,
+          windDirDeg: data.wind_dir_deg,
+          wifiBars: data.wifi_bars,
           milesDriven: data.miles_driven,
           tripActive: data.trip_active,
           routeMilesFrom: data.route_miles_from_anchorage,

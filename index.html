@@ -206,8 +206,8 @@
     }
 
     .vehicle-marker {
-      width: 26px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       transform-origin: 50% 50%;
     }
   </style>
@@ -341,15 +341,12 @@
     const markerIcon = L.divIcon({
       className: "",
       html: `<div class="vehicle-marker">
-        <svg viewBox="0 0 26 40" width="26" height="40">
-          <rect x="1.5" y="1" width="23" height="38" rx="5" fill="#2C6E9E" stroke="#ECE6D6" stroke-width="1.6"/>
-          <rect x="5" y="4.5" width="16" height="13" rx="2.5" fill="#6FB3DE"/>
-          <rect x="5" y="20" width="16" height="16" rx="1.5" fill="#1B4F73"/>
-          <rect x="5" y="20" width="16" height="1.6" fill="#0F3752"/>
-        </svg>
+        <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3EbasAQZybJmYL3OgvVPTlYIoMi/hf_20260803_064522_89519cb7-681e-4da1-b2a7-861b772ff0ae.png"
+             alt="" style="width: 100%; height: 100%; object-fit: contain; display: block;
+             filter: drop-shadow(0 0 2px rgba(0,0,0,0.7)) drop-shadow(0 0 4px rgba(0,0,0,0.4));" />
       </div>`,
-      iconSize: [26, 40],
-      iconAnchor: [13, 20]
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
     });
 
     const marker = L.marker(initialLocation, {

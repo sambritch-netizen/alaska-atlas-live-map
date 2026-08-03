@@ -42,6 +42,10 @@
       font-size: 16px;
     }
 
+    #status.stale {
+      background: rgba(150, 30, 30, 0.85);
+    }
+
     #telemetry {
       position: absolute;
       bottom: 14px;
@@ -74,7 +78,7 @@
 <body>
   <div id="map"></div>
 
-  <div id="status">Waiting for GPS permission…</div>
+  <div id="status">Waiting for GPS relay…</div>
 
   <div id="telemetry">
     <span id="speed">0 mph</span>
@@ -131,14 +135,6 @@
       .setLngLat(initialLocation)
       .addTo(map);
 
-    function metersPerSecondToMph(speed) {
-      if (speed === null || speed === undefined || Number.isNaN(speed)) {
-        return 0;
-      }
-
-      return speed * 2.23694;
-    }
-
     function directionFromDegrees(degrees) {
       if (
         degrees === null ||
@@ -163,64 +159,99 @@
       return directions[index];
     }
 
-    function handlePosition(position) {
-      const coordinates = position.coords;
-      const longitude = coordinates.longitude;
-      const latitude = coordinates.latitude;
-      const heading = coordinates.heading;
-      const mph = metersPerSecondToMph(coordinates.speed);
+    // --- Telemetry relay polling ---------------------------------------
+    // Replaces navigator.geolocation.watchPosition(), which Streamlabs
+    // Mobile's WebView blocks. Instead this polls a tiny local HTTP server
+    // (running in Termux on the same phone) that GPSLogger feeds every few
+    // seconds. Everything stays on-device — no internet round trip needed
+    // for GPS itself.
 
-      marker.setLngLat([longitude, latitude]);
+    const TELEMETRY_URL = "http://127.0.0.1:8080/telemetry";
+    const POLL_INTERVAL_MS = 1000;
+    const STALE_AFTER_MS = 8000; // show "signal lost" if no fresh fix in 8s
 
-      map.easeTo({
-        center: [longitude, latitude],
-        zoom: 9,
-        bearing:
-          heading !== null && !Number.isNaN(heading)
-            ? heading
-            : map.getBearing(),
-        duration: 1500,
-        essential: true
-      });
+    let lastGoodFix = null;
+    let firstFixReceived = false;
 
-      speedElement.textContent = `${Math.round(mph)} mph`;
+    function handleFix(fix) {
+      if (fix.lat !== null && fix.lon !== null) {
+        marker.setLngLat([fix.lon, fix.lat]);
+
+        map.easeTo({
+          center: [fix.lon, fix.lat],
+          zoom: firstFixReceived ? map.getZoom() : 12,
+          bearing:
+            fix.headingDeg !== null && !Number.isNaN(fix.headingDeg)
+              ? fix.headingDeg
+              : map.getBearing(),
+          duration: 1000,
+          essential: true
+        });
+
+        firstFixReceived = true;
+      }
+
+      const mph = fix.speedMph !== null ? Math.round(fix.speedMph) : 0;
+      speedElement.textContent = `${mph} mph`;
       headingElement.textContent =
-        `Heading: ${directionFromDegrees(heading)}`;
-
+        `Heading: ${directionFromDegrees(fix.headingDeg)}`;
       altitudeElement.textContent =
-        coordinates.altitude !== null
-          ? `Altitude: ${Math.round(coordinates.altitude * 3.28084)} ft`
+        fix.altitudeFt !== null
+          ? `Altitude: ${Math.round(fix.altitudeFt)} ft`
           : "Altitude: --";
 
-      statusElement.textContent =
-        `GPS connected • ±${Math.round(coordinates.accuracy)} m`;
+      if (!fix.relayReachable) {
+        statusElement.textContent = "Relay unreachable — check Termux";
+        statusElement.classList.add("stale");
+      } else if (fix.stale) {
+        statusElement.textContent = firstFixReceived
+          ? "GPS signal lost — holding last position"
+          : "Waiting for first GPS fix…";
+        statusElement.classList.add("stale");
+      } else {
+        statusElement.textContent = "GPS connected (relay)";
+        statusElement.classList.remove("stale");
+      }
     }
 
-    function handlePositionError(error) {
-      const messages = {
-        1: "Location permission denied",
-        2: "GPS location unavailable",
-        3: "GPS request timed out"
-      };
+    async function pollTelemetry() {
+      try {
+        const res = await fetch(TELEMETRY_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Relay returned ${res.status}`);
+        const data = await res.json();
 
-      statusElement.textContent =
-        messages[error.code] || "Unable to read GPS";
+        const hasFix = data.lat !== null && data.lon !== null;
+        const ageMs = data.updated_at
+          ? (Date.now() / 1000 - data.updated_at) * 1000
+          : Infinity;
+
+        const fix = {
+          lat: hasFix ? data.lat : lastGoodFix?.lat ?? null,
+          lon: hasFix ? data.lon : lastGoodFix?.lon ?? null,
+          speedMph: data.speed_mph,
+          headingDeg: data.heading_deg,
+          altitudeFt: data.altitude_ft,
+          stale: !hasFix || ageMs > STALE_AFTER_MS,
+          relayReachable: true
+        };
+
+        if (hasFix) lastGoodFix = fix;
+        handleFix(fix);
+      } catch (err) {
+        handleFix({
+          lat: lastGoodFix?.lat ?? null,
+          lon: lastGoodFix?.lon ?? null,
+          speedMph: null,
+          headingDeg: null,
+          altitudeFt: null,
+          stale: true,
+          relayReachable: false
+        });
+      }
     }
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.watchPosition(
-        handlePosition,
-        handlePositionError,
-        {
-          enableHighAccuracy: true,
-          maximumAge: 1000,
-          timeout: 15000
-        }
-      );
-    } else {
-      statusElement.textContent =
-        "This device does not support browser GPS";
-    }
+    pollTelemetry();
+    setInterval(pollTelemetry, POLL_INTERVAL_MS);
   </script>
 </body>
 </html>

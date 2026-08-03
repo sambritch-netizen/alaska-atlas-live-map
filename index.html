@@ -206,8 +206,8 @@
     }
 
     .vehicle-marker {
-      width: 36px;
-      height: 36px;
+      width: 62px;
+      height: 62px;
       transform-origin: 50% 50%;
     }
   </style>
@@ -338,6 +338,24 @@
       maxZoom: 19
     }).addTo(map);
 
+    // Route highlight: the actual Anchorage -> Prudhoe Bay driving route,
+    // fetched from the same repo (no dependency on the phone's local relay).
+    fetch("route_line.json", { cache: "force-cache" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((coords) => {
+        if (!coords) return;
+        L.polyline(coords, {
+          color: "#C1913F",
+          weight: 3,
+          opacity: 0.85,
+          dashArray: "1 8",
+          lineCap: "round"
+        }).addTo(map);
+      })
+      .catch(() => {
+        // route file missing or unreachable -- map still works without it
+      });
+
     const markerIcon = L.divIcon({
       className: "",
       html: `<div class="vehicle-marker">
@@ -345,8 +363,8 @@
              alt="" style="width: 100%; height: 100%; object-fit: contain; display: block;
              filter: drop-shadow(0 0 2px rgba(0,0,0,0.7)) drop-shadow(0 0 4px rgba(0,0,0,0.4));" />
       </div>`,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18]
+      iconSize: [62, 62],
+      iconAnchor: [31, 31]
     });
 
     const marker = L.marker(initialLocation, {

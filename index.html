@@ -313,8 +313,6 @@
     const tempReadout = document.getElementById("temp-readout");
     const needle = document.getElementById("needle");
 
-    const TOTAL_ROUTE_MILES = 860; // Anchorage -> Prudhoe Bay/Deadhorse, driving distance
-
     const tallyElements = {
       moose: document.getElementById("tally-moose"),
       caribou: document.getElementById("tally-caribou"),
@@ -433,10 +431,12 @@
       altitudeElement.textContent =
         fix.altitudeFt !== null ? `${Math.round(fix.altitudeFt)} ft` : "--";
 
-      if (fix.milesDriven !== null && fix.milesDriven !== undefined) {
-        const remaining = Math.max(0, TOTAL_ROUTE_MILES - fix.milesDriven);
-        milesFromElement.textContent = `${fix.milesDriven.toFixed(1)} mi`;
-        milesToElement.textContent = `${remaining.toFixed(1)} mi`;
+      if (fix.routeMilesFrom !== null && fix.routeMilesFrom !== undefined) {
+        milesFromElement.textContent = `${fix.routeMilesFrom.toFixed(1)} mi`;
+        milesToElement.textContent = `${fix.routeMilesRemaining.toFixed(1)} mi`;
+      } else {
+        milesFromElement.textContent = "--";
+        milesToElement.textContent = "--";
       }
 
       updateGauge(fix.tempF);
@@ -473,6 +473,9 @@
           altitudeFt: data.altitude_ft,
           tempF: data.temp_f,
           milesDriven: data.miles_driven,
+          tripActive: data.trip_active,
+          routeMilesFrom: data.route_miles_from_anchorage,
+          routeMilesRemaining: data.route_miles_remaining,
           stale: !hasFix || ageMs > STALE_AFTER_MS,
           relayReachable: true
         };

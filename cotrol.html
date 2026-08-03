@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Field Tally Control</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #10161A;
+      --panel: #171F24;
+      --brass: #C1913F;
+      --parchment: #ECE6D6;
+      --slate: #8B95A1;
+      --warn: #B23B34;
+      --hairline: rgba(236, 230, 214, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--parchment);
+      font-family: 'JetBrains Mono', monospace;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    header {
+      padding: 18px 20px 10px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    header .eyebrow {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      color: var(--brass);
+      text-transform: uppercase;
+    }
+
+    header h1 {
+      margin: 4px 0 0;
+      font-family: 'Oswald', sans-serif;
+      font-weight: 500;
+      font-size: 20px;
+      letter-spacing: 0.04em;
+      color: var(--parchment);
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .tile {
+      background: var(--panel);
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tile .glyph {
+      font-size: 40px;
+      filter: grayscale(1) sepia(1) hue-rotate(-8deg) saturate(2.2) brightness(0.95);
+      opacity: 0.92;
+    }
+
+    .tile .label {
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 0.14em;
+      font-size: 12px;
+      color: var(--slate);
+      text-transform: uppercase;
+    }
+
+    .tile .count {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--parchment);
+      line-height: 1;
+      margin: 2px 0 8px;
+    }
+
+    .tile .buttons {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    button {
+      flex: 1;
+      border: 1px solid var(--hairline);
+      background: transparent;
+      color: var(--brass);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 20px;
+      border-radius: 8px;
+      padding: 10px 0;
+    }
+
+    button:active {
+      background: var(--brass);
+      color: var(--bg);
+    }
+
+    button.minus {
+      color: var(--slate);
+      font-size: 16px;
+    }
+
+    #status {
+      text-align: center;
+      font-size: 11px;
+      color: var(--slate);
+      padding: 10px;
+    }
+
+    #status.err { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Dalton Highway Expedition</div>
+    <h1>Field Tally Control</h1>
+  </header>
+
+  <div id="grid">
+    <div class="tile" data-animal="moose">
+      <div class="glyph">🫎</div>
+      <div class="label">Moose</div>
+      <div class="count" id="count-moose">0</div>
+      <div class="buttons">
+        <button class="minus" data-action="decrement">&minus;</button>
+        <button data-action="increment">+1</button>
+      </div>
+    </div>
+
+    <div class="tile" data-animal="caribou">
+      <div class="glyph">🦌</div>
+      <div class="label">Caribou</div>
+      <div class="count" id="count-caribou">0</div>
+      <div class="buttons">
+        <button class="minus" data-action="decrement">&minus;</button>
+        <button data-action="increment">+1</button>
+      </div>
+    </div>
+
+    <div class="tile" data-animal="muskox">
+      <div class="glyph">🐃</div>
+      <div class="label">Musk Ox</div>
+      <div class="count" id="count-muskox">0</div>
+      <div class="buttons">
+        <button class="minus" data-action="decrement">&minus;</button>
+        <button data-action="increment">+1</button>
+      </div>
+    </div>
+
+    <div class="tile" data-animal="bear">
+      <div class="glyph">🐻</div>
+      <div class="label">Bear</div>
+      <div class="count" id="count-bear">0</div>
+      <div class="buttons">
+        <button class="minus" data-action="decrement">&minus;</button>
+        <button data-action="increment">+1</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">connecting to relay…</div>
+
+  <script>
+    const RELAY = "http://127.0.0.1:8080";
+    const statusEl = document.getElementById("status");
+
+    function renderCounts(counts) {
+      for (const animal of ["moose", "caribou", "muskox", "bear"]) {
+        const el = document.getElementById(`count-${animal}`);
+        if (el && counts[animal] !== undefined) el.textContent = counts[animal];
+      }
+    }
+
+    async function refreshCounts() {
+      try {
+        const res = await fetch(`${RELAY}/counts`, { cache: "no-store" });
+        const data = await res.json();
+        renderCounts(data);
+        statusEl.textContent = "connected to relay";
+        statusEl.classList.remove("err");
+      } catch (err) {
+        statusEl.textContent = "relay unreachable — check Termux";
+        statusEl.classList.add("err");
+      }
+    }
+
+    document.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tile = btn.closest(".tile");
+        const animal = tile.dataset.animal;
+        const action = btn.dataset.action;
+        try {
+          const res = await fetch(`${RELAY}/counts/${action}?animal=${animal}`, { cache: "no-store" });
+          const data = await res.json();
+          renderCounts(data);
+          statusEl.textContent = "connected to relay";
+          statusEl.classList.remove("err");
+        } catch (err) {
+          statusEl.textContent = "relay unreachable — check Termux";
+          statusEl.classList.add("err");
+        }
+      });
+    });
+
+    refreshCounts();
+    setInterval(refreshCounts, 3000);
+  </script>
+</body>
+</html>

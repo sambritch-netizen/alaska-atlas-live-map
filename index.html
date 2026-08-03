@@ -13,8 +13,22 @@
     href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css"
     rel="stylesheet"
   />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <style>
+    :root {
+      --bg-panel: #10161A;
+      --brass: #C1913F;
+      --parchment: #ECE6D6;
+      --slate: #8B95A1;
+      --cold: #4C86A8;
+      --warn: #B23B34;
+      --hairline: rgba(236, 230, 214, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
     html,
     body {
       width: 100%;
@@ -22,7 +36,8 @@
       margin: 0;
       overflow: hidden;
       background: transparent;
-      font-family: Arial, sans-serif;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--parchment);
     }
 
     #map {
@@ -30,47 +45,135 @@
       inset: 0;
     }
 
-    #status {
+    .eyebrow {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+      color: var(--brass);
+      text-transform: uppercase;
+    }
+
+    #status-badge {
       position: absolute;
       top: 14px;
       left: 14px;
       z-index: 10;
-      padding: 8px 12px;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.75);
-      color: white;
-      font-size: 16px;
+      padding: 9px 14px;
+      border-radius: 6px;
+      background: rgba(16, 22, 26, 0.88);
+      border: 1px solid var(--hairline);
     }
 
-    #status.stale {
-      background: rgba(150, 30, 30, 0.85);
+    #status-badge .eyebrow { margin-bottom: 2px; }
+
+    #status-badge .coords {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
 
-    #telemetry {
+    #status-badge.stale .coords { color: var(--warn); }
+
+    #gauge-wrap {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      z-index: 10;
+      width: 92px;
+      text-align: center;
+    }
+
+    #gauge-wrap .eyebrow {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    #temp-readout {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: -30px;
+    }
+
+    #lower-third {
       position: absolute;
       bottom: 14px;
       left: 14px;
       right: 14px;
       z-index: 10;
 
+      background: rgba(16, 22, 26, 0.88);
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      padding: 12px 16px 10px;
+    }
+
+    #lower-third .eyebrow {
+      margin-bottom: 8px;
+    }
+
+    #tally-row {
+      display: flex;
+      gap: 22px;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .tally-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tally-item .glyph {
+      font-size: 20px;
+      filter: grayscale(1) sepia(1) hue-rotate(-8deg) saturate(2.2) brightness(0.95);
+      opacity: 0.92;
+    }
+
+    .tally-item .n {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .tally-item .label {
+      font-size: 10px;
+      color: var(--slate);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: 'Oswald', sans-serif;
+    }
+
+    #telemetry-row {
       display: flex;
       justify-content: space-between;
-      gap: 8px;
+      font-size: 15px;
+      font-weight: 500;
+    }
 
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: rgba(0, 0, 0, 0.75);
-      color: white;
-      font-size: 16px;
+    #telemetry-row .stat .n {
+      font-weight: 700;
+      color: var(--parchment);
+    }
+
+    #telemetry-row .stat .label {
+      font-size: 9px;
+      color: var(--slate);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: 'Oswald', sans-serif;
+      display: block;
+      margin-bottom: 2px;
     }
 
     .vehicle-marker {
       width: 26px;
       height: 26px;
-      border: 4px solid white;
+      border: 4px solid var(--parchment);
       border-radius: 50%;
-      background: #1976d2;
-      box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.3);
+      background: var(--brass);
+      box-shadow: 0 0 0 4px rgba(193, 145, 63, 0.3);
     }
   </style>
 </head>
@@ -78,21 +181,96 @@
 <body>
   <div id="map"></div>
 
-  <div id="status">Waiting for GPS relay…</div>
+  <div id="status-badge">
+    <span class="eyebrow">GPS Relay</span>
+    <div class="coords" id="coords">Waiting for fix…</div>
+  </div>
 
-  <div id="telemetry">
-    <span id="speed">0 mph</span>
-    <span id="heading">Heading: --</span>
-    <span id="altitude">Altitude: --</span>
+  <div id="gauge-wrap">
+    <span class="eyebrow">Temp</span>
+    <svg id="gauge" viewBox="0 0 100 70" width="92" height="64">
+      <path d="M 12 58 A 38 38 0 1 1 88 58" fill="none" stroke="rgba(236,230,214,0.15)" stroke-width="6" stroke-linecap="round"/>
+      <path d="M 12 58 A 38 38 0 1 1 88 58" fill="none" stroke="url(#gaugeGradient)" stroke-width="6" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#4C86A8"/>
+          <stop offset="50%" stop-color="#C1913F"/>
+          <stop offset="100%" stop-color="#B23B34"/>
+        </linearGradient>
+      </defs>
+      <line id="needle" x1="50" y1="58" x2="50" y2="26" stroke="#ECE6D6" stroke-width="2.5" stroke-linecap="round" style="transform-origin: 50px 58px;"/>
+      <circle cx="50" cy="58" r="4" fill="#C1913F"/>
+    </svg>
+    <div id="temp-readout">-- °F</div>
+  </div>
+
+  <div id="lower-third">
+    <span class="eyebrow">Expedition Log</span>
+
+    <div id="tally-row">
+      <div class="tally-item">
+        <span class="glyph">🫎</span>
+        <div>
+          <span class="n" id="tally-moose">0</span>
+          <span class="label" style="display:block;">Moose</span>
+        </div>
+      </div>
+      <div class="tally-item">
+        <span class="glyph">🦌</span>
+        <div>
+          <span class="n" id="tally-caribou">0</span>
+          <span class="label" style="display:block;">Caribou</span>
+        </div>
+      </div>
+      <div class="tally-item">
+        <span class="glyph">🐃</span>
+        <div>
+          <span class="n" id="tally-muskox">0</span>
+          <span class="label" style="display:block;">Musk Ox</span>
+        </div>
+      </div>
+      <div class="tally-item">
+        <span class="glyph">🐻</span>
+        <div>
+          <span class="n" id="tally-bear">0</span>
+          <span class="label" style="display:block;">Bear</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="telemetry-row">
+      <div class="stat">
+        <span class="label">Speed</span>
+        <span class="n" id="speed">0 mph</span>
+      </div>
+      <div class="stat">
+        <span class="label">Heading</span>
+        <span class="n" id="heading">--</span>
+      </div>
+      <div class="stat">
+        <span class="label">Altitude</span>
+        <span class="n" id="altitude">--</span>
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
 
   <script>
-    const statusElement = document.getElementById("status");
+    const statusBadge = document.getElementById("status-badge");
+    const coordsElement = document.getElementById("coords");
     const speedElement = document.getElementById("speed");
     const headingElement = document.getElementById("heading");
     const altitudeElement = document.getElementById("altitude");
+    const tempReadout = document.getElementById("temp-readout");
+    const needle = document.getElementById("needle");
+
+    const tallyElements = {
+      moose: document.getElementById("tally-moose"),
+      caribou: document.getElementById("tally-caribou"),
+      muskox: document.getElementById("tally-muskox"),
+      bear: document.getElementById("tally-bear"),
+    };
 
     const initialLocation = [-149.9003, 61.2181];
 
@@ -136,39 +314,45 @@
       .addTo(map);
 
     function directionFromDegrees(degrees) {
-      if (
-        degrees === null ||
-        degrees === undefined ||
-        Number.isNaN(degrees)
-      ) {
+      if (degrees === null || degrees === undefined || Number.isNaN(degrees)) {
         return "--";
       }
-
-      const directions = [
-        "N",
-        "NE",
-        "E",
-        "SE",
-        "S",
-        "SW",
-        "W",
-        "NW"
-      ];
-
+      const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
       const index = Math.round(degrees / 45) % 8;
       return directions[index];
     }
 
-    // --- Telemetry relay polling ---------------------------------------
-    // Replaces navigator.geolocation.watchPosition(), which Streamlabs
-    // Mobile's WebView blocks. Instead this polls a tiny local HTTP server
-    // (running in Termux on the same phone) that GPSLogger feeds every few
-    // seconds. Everything stays on-device — no internet round trip needed
-    // for GPS itself.
+    function formatCoord(value, posLabel, negLabel) {
+      if (value === null || value === undefined) return "--";
+      const dir = value >= 0 ? posLabel : negLabel;
+      return `${Math.abs(value).toFixed(4)}° ${dir}`;
+    }
 
-    const TELEMETRY_URL = "http://127.0.0.1:8080/telemetry";
+    // Gauge maps -20F to +80F across a 270-degree sweep, clamped at ends.
+    const GAUGE_MIN_F = -20;
+    const GAUGE_MAX_F = 80;
+
+    function updateGauge(tempF) {
+      if (tempF === null || tempF === undefined) {
+        tempReadout.textContent = "-- °F";
+        return;
+      }
+      const clamped = Math.max(GAUGE_MIN_F, Math.min(GAUGE_MAX_F, tempF));
+      const fraction = (clamped - GAUGE_MIN_F) / (GAUGE_MAX_F - GAUGE_MIN_F);
+      const angle = -135 + fraction * 270;
+      needle.style.transform = `rotate(${angle}deg)`;
+      tempReadout.textContent = `${Math.round(tempF)} °F`;
+    }
+
+    // --- Telemetry relay polling ---------------------------------------
+    // Streamlabs Mobile's WebView blocks navigator.geolocation, so instead
+    // this polls a local HTTP relay (Termux, same phone) that GPSLogger
+    // and a background weather check keep updated. Runs entirely
+    // over 127.0.0.1 -- no internet dependency for the GPS hop itself.
+
+    const RELAY = "http://127.0.0.1:8080";
     const POLL_INTERVAL_MS = 1000;
-    const STALE_AFTER_MS = 8000; // show "signal lost" if no fresh fix in 8s
+    const STALE_AFTER_MS = 8000;
 
     let lastGoodFix = null;
     let firstFixReceived = false;
@@ -189,34 +373,34 @@
         });
 
         firstFixReceived = true;
+        coordsElement.textContent =
+          `${formatCoord(fix.lat, "N", "S")}  ${formatCoord(fix.lon, "E", "W")}`;
       }
 
       const mph = fix.speedMph !== null ? Math.round(fix.speedMph) : 0;
       speedElement.textContent = `${mph} mph`;
-      headingElement.textContent =
-        `Heading: ${directionFromDegrees(fix.headingDeg)}`;
+      headingElement.textContent = directionFromDegrees(fix.headingDeg);
       altitudeElement.textContent =
-        fix.altitudeFt !== null
-          ? `Altitude: ${Math.round(fix.altitudeFt)} ft`
-          : "Altitude: --";
+        fix.altitudeFt !== null ? `${Math.round(fix.altitudeFt)} ft` : "--";
+
+      updateGauge(fix.tempF);
 
       if (!fix.relayReachable) {
-        statusElement.textContent = "Relay unreachable — check Termux";
-        statusElement.classList.add("stale");
+        coordsElement.textContent = "Relay unreachable";
+        statusBadge.classList.add("stale");
       } else if (fix.stale) {
-        statusElement.textContent = firstFixReceived
-          ? "GPS signal lost — holding last position"
-          : "Waiting for first GPS fix…";
-        statusElement.classList.add("stale");
+        coordsElement.textContent = firstFixReceived
+          ? "Signal lost — last known position"
+          : "Waiting for first fix…";
+        statusBadge.classList.add("stale");
       } else {
-        statusElement.textContent = "GPS connected (relay)";
-        statusElement.classList.remove("stale");
+        statusBadge.classList.remove("stale");
       }
     }
 
     async function pollTelemetry() {
       try {
-        const res = await fetch(TELEMETRY_URL, { cache: "no-store" });
+        const res = await fetch(`${RELAY}/telemetry`, { cache: "no-store" });
         if (!res.ok) throw new Error(`Relay returned ${res.status}`);
         const data = await res.json();
 
@@ -231,6 +415,7 @@
           speedMph: data.speed_mph,
           headingDeg: data.heading_deg,
           altitudeFt: data.altitude_ft,
+          tempF: data.temp_f,
           stale: !hasFix || ageMs > STALE_AFTER_MS,
           relayReachable: true
         };
@@ -244,14 +429,32 @@
           speedMph: null,
           headingDeg: null,
           altitudeFt: null,
+          tempF: null,
           stale: true,
           relayReachable: false
         });
       }
     }
 
+    async function pollCounts() {
+      try {
+        const res = await fetch(`${RELAY}/counts`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        for (const animal of Object.keys(tallyElements)) {
+          if (data[animal] !== undefined) {
+            tallyElements[animal].textContent = data[animal];
+          }
+        }
+      } catch (err) {
+        // leave last known tally on screen
+      }
+    }
+
     pollTelemetry();
+    pollCounts();
     setInterval(pollTelemetry, POLL_INTERVAL_MS);
+    setInterval(pollCounts, 2000);
   </script>
 </body>
 </html>
